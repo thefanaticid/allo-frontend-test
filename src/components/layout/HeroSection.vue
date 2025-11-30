@@ -42,12 +42,12 @@
             </div>
             <div class="stat-divider d-none d-sm-block" />
             <div class="stat-item">
-              <span class="stat-value gradient-text">4</span>
+              <span class="stat-value gradient-text">{{ activeCount }}</span>
               <span class="stat-label text-medium-emphasis">Active</span>
             </div>
             <div class="stat-divider d-none d-sm-block" />
             <div class="stat-item">
-              <span class="stat-value gradient-text">2002</span>
+              <span class="stat-value gradient-text">{{ sinceYear }}</span>
               <span class="stat-label text-medium-emphasis">Since</span>
             </div>
           </div>
@@ -163,10 +163,14 @@
 <script lang="ts" setup>
 interface Props {
   rocketCount?: number
+  activeCount?: number
+  sinceYear?: number
 }
 
 withDefaults(defineProps<Props>(), {
   rocketCount: 0,
+  activeCount: 0,
+  sinceYear: 2002,
 })
 </script>
 

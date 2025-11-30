@@ -1,7 +1,10 @@
 <template>
   <div class="rockets-page">
     <!-- Hero Section -->
-    <HeroSection :rocket-count="rocketStore.allRockets.length" />
+    <HeroSection 
+      :rocket-count="rocketStore.allRockets.length"
+      :active-count="activeRocketCount"
+    />
     
     <!-- Main Content -->
     <v-container class="rockets-content py-8">
@@ -132,10 +135,10 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRocketStore } from '@/stores/rockets'
-import type { NewRocketForm } from '@/types/rocket'
+import type { NewRocketForm, Rocket } from '@/types/rocket'
 
 // Components
 import HeroSection from '@/components/layout/HeroSection.vue'
@@ -152,6 +155,18 @@ const rocketStore = useRocketStore()
 // State
 const showAddDialog = ref(false)
 const showSuccessSnackbar = ref(false)
+
+// Computed
+const activeRocketCount = computed(() => {
+  return rocketStore.allRockets.filter((rocket) => {
+    // Check if it's a Rocket (from API) with 'active' property
+    if ('active' in rocket) {
+      return (rocket as Rocket).active
+    }
+    // Custom rockets are considered active by default
+    return true
+  }).length
+})
 
 // Lifecycle
 onMounted(() => {

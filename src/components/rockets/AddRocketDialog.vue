@@ -51,13 +51,14 @@
               <v-textarea
                 v-model="form.description"
                 label="Description"
-                placeholder="Describe the rocket's capabilities and features..."
                 prepend-inner-icon="mdi-text"
                 :rules="[rules.required, rules.minLength(20)]"
                 counter
                 maxlength="500"
                 rows="3"
                 auto-grow
+                hint="Describe the rocket's capabilities and features..."
+                persistent-hint
               />
             </v-col>
             

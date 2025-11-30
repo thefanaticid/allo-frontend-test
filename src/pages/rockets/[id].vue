@@ -134,7 +134,7 @@
           <v-col cols="12" md="4">
             <v-card class="spec-card glass-card h-100">
               <v-card-title class="d-flex align-center gap-2">
-                <v-icon color="info">mdi-ruler</v-icon>
+                <v-icon color="info" class="mr-2">mdi-ruler</v-icon>
                 Dimensions
               </v-card-title>
               <v-card-text>
@@ -160,7 +160,7 @@
           <v-col cols="12" md="4">
             <v-card class="spec-card glass-card h-100">
               <v-card-title class="d-flex align-center gap-2">
-                <v-icon color="success">mdi-speedometer</v-icon>
+                <v-icon color="success" class="mr-2">mdi-speedometer</v-icon>
                 Performance
               </v-card-title>
               <v-card-text>
@@ -186,7 +186,7 @@
           <v-col cols="12" md="4">
             <v-card class="spec-card glass-card h-100">
               <v-card-title class="d-flex align-center gap-2">
-                <v-icon color="warning">mdi-information</v-icon>
+                <v-icon color="warning" class="mr-2">mdi-information</v-icon>
                 Status
               </v-card-title>
               <v-card-text>
