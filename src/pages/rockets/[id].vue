@@ -243,7 +243,7 @@ import type { RocketItem, Rocket } from '@/types/rocket'
 import LoadingState from '@/components/ui/LoadingState.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 
-const route = useRoute()
+const route = useRoute<'/rockets/[id]'>()
 const router = useRouter()
 const rocketStore = useRocketStore()
 
