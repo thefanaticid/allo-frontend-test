@@ -3,8 +3,8 @@
  */
 
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
-import { rocketApi } from '@/services/api'
+import { ref, computed } from 'vue'
+import { rocketApi, localStorageApi, hasApiKey } from '@/services/api'
 import type { Rocket, CustomRocket, RocketItem, RocketFilters, NewRocketForm } from '@/types/rocket'
 
 export const useRocketStore = defineStore('rockets', () => {
@@ -18,6 +18,9 @@ export const useRocketStore = defineStore('rockets', () => {
     search: '',
     country: '',
   })
+
+  // Check if using API or local storage
+  const isUsingApi = computed(() => hasApiKey())
 
   // Getters
   const allRockets = computed<RocketItem[]>(() => {
@@ -65,6 +68,13 @@ export const useRocketStore = defineStore('rockets', () => {
   // Actions
   
   /**
+   * Load custom rockets from local storage
+   */
+  function loadCustomRocketsFromStorage() {
+    customRockets.value = localStorageApi.getCustomRockets()
+  }
+
+  /**
    * Fetch rockets using Query API with current filters
    */
   async function fetchRockets() {
@@ -100,9 +110,10 @@ export const useRocketStore = defineStore('rockets', () => {
   }
 
   /**
-   * Initialize store - fetch countries and rockets
+   * Initialize store - fetch countries, rockets, and load local storage
    */
   async function initialize() {
+    loadCustomRocketsFromStorage()
     await fetchCountries()
     await fetchRockets()
   }
@@ -136,20 +147,141 @@ export const useRocketStore = defineStore('rockets', () => {
     }
   }
 
-  function addCustomRocket(form: NewRocketForm) {
-    const newRocket: CustomRocket = {
-      id: `custom-${Date.now()}`,
-      name: form.name,
-      description: form.description,
-      flickr_images: form.imageUrl ? [form.imageUrl] : [],
-      cost_per_launch: form.cost_per_launch || 0,
-      country: form.country,
-      first_flight: form.first_flight,
-      isCustom: true,
+  /**
+   * Add a new custom rocket
+   * Uses API if key is available, otherwise uses local storage
+   */
+  async function addCustomRocket(form: NewRocketForm): Promise<CustomRocket> {
+    if (hasApiKey()) {
+      // Try to use API
+      try {
+        const payload = {
+          name: form.name,
+          description: form.description,
+          flickr_images: form.imageUrl ? [form.imageUrl] : [],
+          cost_per_launch: form.cost_per_launch || 0,
+          country: form.country,
+          first_flight: form.first_flight,
+        }
+        
+        const result = await rocketApi.createRocket(payload)
+        // Refresh rockets list
+        await fetchRockets()
+        
+        // Return as CustomRocket format for compatibility
+        return {
+          id: result.id,
+          name: result.name,
+          description: result.description,
+          flickr_images: result.flickr_images,
+          cost_per_launch: result.cost_per_launch,
+          country: result.country,
+          first_flight: result.first_flight,
+          isCustom: true,
+        }
+      } catch (err) {
+        console.warn('API create failed, falling back to local storage:', err)
+        // Fall through to local storage
+      }
     }
 
+    // Use local storage
+    const newRocket = localStorageApi.addCustomRocket(form)
     customRockets.value.push(newRocket)
     return newRocket
+  }
+
+  /**
+   * Update a custom rocket
+   * Uses API if key is available, otherwise uses local storage
+   */
+  async function updateCustomRocket(id: string, form: NewRocketForm): Promise<CustomRocket | null> {
+    // Check if it's a local custom rocket
+    const isLocalCustom = customRockets.value.some((r) => r.id === id)
+
+    if (isLocalCustom) {
+      // Update in local storage
+      const updated = localStorageApi.updateCustomRocket(id, form)
+      if (updated) {
+        const index = customRockets.value.findIndex((r) => r.id === id)
+        if (index !== -1) {
+          customRockets.value[index] = updated
+        }
+      }
+      return updated
+    }
+
+    // Try API update if key is available
+    if (hasApiKey()) {
+      try {
+        const payload = {
+          name: form.name,
+          description: form.description,
+          flickr_images: form.imageUrl ? [form.imageUrl] : undefined,
+          cost_per_launch: form.cost_per_launch || 0,
+          country: form.country,
+          first_flight: form.first_flight,
+        }
+
+        const result = await rocketApi.updateRocket(id, payload)
+        await fetchRockets()
+
+        return {
+          id: result.id,
+          name: result.name,
+          description: result.description,
+          flickr_images: result.flickr_images,
+          cost_per_launch: result.cost_per_launch,
+          country: result.country,
+          first_flight: result.first_flight,
+          isCustom: true,
+        }
+      } catch (err) {
+        console.error('Failed to update rocket via API:', err)
+        throw err
+      }
+    }
+
+    return null
+  }
+
+  /**
+   * Delete a custom rocket
+   * Uses API if key is available, otherwise uses local storage
+   */
+  async function deleteCustomRocket(id: string): Promise<boolean> {
+    // Check if it's a local custom rocket
+    const isLocalCustom = customRockets.value.some((r) => r.id === id)
+
+    if (isLocalCustom) {
+      // Delete from local storage
+      const success = localStorageApi.deleteCustomRocket(id)
+      if (success) {
+        customRockets.value = customRockets.value.filter((r) => r.id !== id)
+      }
+      return success
+    }
+
+    // Try API delete if key is available
+    if (hasApiKey()) {
+      try {
+        await rocketApi.deleteRocket(id)
+        await fetchRockets()
+        return true
+      } catch (err) {
+        console.error('Failed to delete rocket via API:', err)
+        throw err
+      }
+    }
+
+    return false
+  }
+
+  /**
+   * Check if a rocket can be edited/deleted (only custom rockets)
+   */
+  function isCustomRocket(id: string): boolean {
+    return customRockets.value.some((r) => r.id === id)
   }
 
   // Debounce timer for filter changes
@@ -185,6 +317,7 @@ export const useRocketStore = defineStore('rockets', () => {
     error,
     filters,
     // Getters
+    isUsingApi,
     allRockets,
     countries,
     filteredRockets,
@@ -196,6 +329,9 @@ export const useRocketStore = defineStore('rockets', () => {
     fetchCountries,
     fetchRocketById,
     addCustomRocket,
+    updateCustomRocket,
+    deleteCustomRocket,
+    isCustomRocket,
     setFilters,
     clearFilters,
     clearError,

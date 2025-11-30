@@ -183,9 +183,13 @@ function navigateToDetail(id: string) {
   router.push(`/rockets/${id}`)
 }
 
-function handleAddRocket(form: NewRocketForm) {
-  rocketStore.addCustomRocket(form)
-  showSuccessSnackbar.value = true
+async function handleAddRocket(form: NewRocketForm) {
+  try {
+    await rocketStore.addCustomRocket(form)
+    showSuccessSnackbar.value = true
+  } catch (error) {
+    console.error('Failed to add rocket:', error)
+  }
 }
 </script>
 
