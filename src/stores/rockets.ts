@@ -3,7 +3,7 @@
  */
 
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { rocketApi } from '@/services/api'
 import type { Rocket, CustomRocket, RocketItem, RocketFilters, NewRocketForm } from '@/types/rocket'
 
@@ -11,6 +11,7 @@ export const useRocketStore = defineStore('rockets', () => {
   // State
   const rockets = ref<Rocket[]>([])
   const customRockets = ref<CustomRocket[]>([])
+  const allCountries = ref<string[]>([])
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const filters = ref<RocketFilters>({
@@ -23,9 +24,10 @@ export const useRocketStore = defineStore('rockets', () => {
     return [...rockets.value, ...customRockets.value]
   })
 
+  // Countries from API + custom rockets
   const countries = computed(() => {
-    const countrySet = new Set<string>()
-    allRockets.value.forEach((rocket) => {
+    const countrySet = new Set<string>(allCountries.value)
+    customRockets.value.forEach((rocket) => {
       if (rocket.country) {
         countrySet.add(rocket.country)
       }
@@ -33,37 +35,48 @@ export const useRocketStore = defineStore('rockets', () => {
     return Array.from(countrySet).sort()
   })
 
+  // Filtered rockets - combines API results with custom rockets filter
   const filteredRockets = computed<RocketItem[]>(() => {
-    let result = allRockets.value
+    // API rockets are already filtered by server
+    let result: RocketItem[] = [...rockets.value]
 
-    // Filter by search term
+    // Filter custom rockets on client-side
+    let filteredCustom = customRockets.value
+
     if (filters.value.search) {
       const searchLower = filters.value.search.toLowerCase()
-      result = result.filter(
+      filteredCustom = filteredCustom.filter(
         (rocket) =>
           rocket.name.toLowerCase().includes(searchLower) ||
           rocket.description.toLowerCase().includes(searchLower)
       )
     }
 
-    // Filter by country
     if (filters.value.country) {
-      result = result.filter((rocket) => rocket.country === filters.value.country)
+      filteredCustom = filteredCustom.filter((rocket) => rocket.country === filters.value.country)
     }
 
-    return result
+    return [...result, ...filteredCustom]
   })
 
   const hasError = computed(() => error.value !== null)
   const isEmpty = computed(() => !isLoading.value && !hasError.value && filteredRockets.value.length === 0)
 
   // Actions
+  
+  /**
+   * Fetch rockets using Query API with current filters
+   */
   async function fetchRockets() {
     isLoading.value = true
     error.value = null
 
     try {
-      const data = await rocketApi.getAllRockets()
+      // Use Query API with filters
+      const data = await rocketApi.queryRockets({
+        search: filters.value.search || undefined,
+        country: filters.value.country || undefined,
+      })
       rockets.value = data
     } catch (err) {
       console.error('Failed to fetch rockets:', err)
@@ -71,6 +84,27 @@ export const useRocketStore = defineStore('rockets', () => {
     } finally {
       isLoading.value = false
     }
+  }
+
+  /**
+   * Fetch all countries for filter dropdown
+   */
+  async function fetchCountries() {
+    try {
+      const countries = await rocketApi.getCountries()
+      allCountries.value = countries
+    } catch (err) {
+      console.error('Failed to fetch countries:', err)
+      // Non-critical error, just log it
+    }
+  }
+
+  /**
+   * Initialize store - fetch countries and rockets
+   */
+  async function initialize() {
+    await fetchCountries()
+    await fetchRockets()
   }
 
   async function fetchRocketById(id: string): Promise<RocketItem | null> {
@@ -118,12 +152,25 @@ export const useRocketStore = defineStore('rockets', () => {
     return newRocket
   }
 
+  // Debounce timer for filter changes
+  let filterDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
   function setFilters(newFilters: Partial<RocketFilters>) {
     filters.value = { ...filters.value, ...newFilters }
+    
+    // Debounce API calls when filters change
+    if (filterDebounceTimer) {
+      clearTimeout(filterDebounceTimer)
+    }
+    
+    filterDebounceTimer = setTimeout(() => {
+      fetchRockets()
+    }, 300)
   }
 
   function clearFilters() {
     filters.value = { search: '', country: '' }
+    fetchRockets()
   }
 
   function clearError() {
@@ -144,7 +191,9 @@ export const useRocketStore = defineStore('rockets', () => {
     hasError,
     isEmpty,
     // Actions
+    initialize,
     fetchRockets,
+    fetchCountries,
     fetchRocketById,
     addCustomRocket,
     setFilters,

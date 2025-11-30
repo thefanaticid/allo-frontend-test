@@ -48,7 +48,7 @@
       <ErrorState
         v-else-if="rocketStore.hasError"
         :message="rocketStore.error || 'Failed to load rockets'"
-        @retry="fetchRockets"
+        @retry="retryFetch"
       />
       
       <!-- Empty State -->
@@ -155,11 +155,12 @@ const showSuccessSnackbar = ref(false)
 
 // Lifecycle
 onMounted(() => {
-  fetchRockets()
+  // Initialize store - fetches countries and rockets
+  rocketStore.initialize()
 })
 
 // Methods
-function fetchRockets() {
+function retryFetch() {
   rocketStore.fetchRockets()
 }
 
